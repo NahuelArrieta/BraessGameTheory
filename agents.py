@@ -8,6 +8,7 @@ class Agente:
         learning_rate_range = globals.AGENT_LEARNING_RATE_RANGE[type]
         self.learning_rate = random.uniform(learning_rate_range[0], learning_rate_range[1])
         self.p = 0.5  + random.uniform(-0.05, 0.05)
+        self.snapshots = []  
 
     def update_belief(self, shortcut_saturated):
         self.p = (1 - self.learning_rate) * self.p + self.learning_rate * shortcut_saturated
@@ -18,15 +19,30 @@ class Agente:
     def calculate_expected_cost_safe(self):
         return globals.SAFE_ROAD_COST
 
-    def decide(self):
-        expected_cost_shortcut = self.calculate_expected_cost_shortcut() * random.uniform(0.9, 1.1)
-        expected_cost_safe = self.calculate_expected_cost_safe()
-
+    def decide(self, expected_cost_shortcut, expected_cost_safe):
         if expected_cost_shortcut < expected_cost_safe:
             return globals.SHORTCUT_KEY
         else:
             return globals.SAFE_ROAD_KEY
 
+    def iterate(self, round, shortcut_saturated):
+        self.update_belief(shortcut_saturated)
+
+        expected_cost_shortcut = self.calculate_expected_cost_shortcut() * random.uniform(0.9, 1.1)
+        expected_cost_safe = self.calculate_expected_cost_safe()
+
+        decision = self.decide(expected_cost_shortcut, expected_cost_safe)
+        self.snapshots.append({
+            "round": round,
+            "belief": self.p,
+            "expected_cost_shortcut": expected_cost_shortcut,
+            "expected_cost_safe": expected_cost_safe,
+            "decision": decision
+        })
+
+        return decision
+        
+        
 
 
 class AdverseAgent(Agente):
