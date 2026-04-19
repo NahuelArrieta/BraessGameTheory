@@ -1,93 +1,141 @@
 import streamlit as st
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 import random
+import pandas as pd
+import numpy as np
+import globals
+from controller import run_simulation
 
-# --- CLASES DE AGENTES (Lógica simplificada del Profesor) ---
-class Agente:
-    def __init__(self, id, alpha, tipo):
-        self.id = id
-        self.alpha = alpha
-        self.tipo = tipo
-        self.p = 0.5  # Creencia inicial de saturación
 
-    def actualizar_creencia(self, hubo_sat):
-        self.p = (1 - self.alpha) * self.p + self.alpha * hubo_sat
+st.set_page_config(page_title="Paradoja de Braess", layout="wide")
+st.title("Simulación: Paradoja de Braess")
 
-    def decidir(self, c_s, c_libre, c_sat):
-        if self.tipo == "Neutral":
-            e_ca = (self.p * c_sat) + ((1 - self.p) * c_libre)
-            return "Atajo" if e_ca < c_s else "Segura"
-        else: # Averso (Costo cuadrático t^2)
-            costo_atajo = (self.p * (c_sat**2)) + ((1 - self.p) * (c_libre**2))
-            return "Atajo" if costo_atajo < (c_s**2) else "Segura"
+## Form
+with st.sidebar.form("config_simulacion"):
+    st.header("Configuración")
 
-# --- INTERFAZ DE STREAMLIT ---
-st.set_page_config(page_title="Simulador Paradoja de Braess", layout="wide")
-st.title("🧪 Laboratorio: Paradoja de Braess")
-st.markdown("Ajustá los parámetros para ver cómo la psicología del riesgo colapsa la red.")
+    ##  Agent Configuration
+    col1, col2 = st.columns(2)
 
-# Sidebar: Controles
-st.sidebar.header("Parámetros de la Red")
-n_agentes = st.sidebar.slider("N° de Agentes", 10, 500, 100)
-capacidad = st.sidebar.slider("Capacidad del Atajo (K)", 5, 100, 25)
-c_s = st.sidebar.number_input("Costo Ruta Segura (Cs)", value=45)
-c_libre = st.sidebar.number_input("Costo Atajo Libre (Clibre)", value=10)
-gamma = st.sidebar.slider("Factor de Congestión (Gamma)", 0.1, 5.0, 1.5)
+    with col1:
+        n_adverse_agents = st.number_input("N° de Agentes Aversos", value=50)
 
-st.sidebar.header("Población")
-pct_aversos = st.sidebar.slider("% Agentes Aversos (t²)", 0, 100, 50)
-rondas = st.sidebar.slider("Rondas de Simulación", 10, 200, 100)
+    with col2:
+        n_neutral_agents = st.number_input("N° de Agentes Neutrales", value=50)
 
-# Inicializar agentes
-poblacion = []
-for i in range(n_agentes):
-    tipo = "Averso" if i < (n_agentes * pct_aversos / 100) else "Neutral"
-    poblacion.append(Agente(i, alpha=0.2, tipo=tipo))
+    total_agents = n_adverse_agents + n_neutral_agents
 
-# Simulación
-historial_flujo = []
-historial_costo_medio = []
+    ## Cost Configuration
+    st.write("")
+    col1, col2 = st.columns(2)
 
-for r in range(rondas):
-    decisiones = [a.decidir(c_s, c_libre, c_libre + gamma * (n_agentes-capacidad)) for a in poblacion]
-    x = decisiones.count("Atajo")
+    with col1:
+        safe_road_costs = st.number_input("Costo Ruta Segura", value=45)
+
+    with col2:
+        free_shortcut_cost = st.number_input("Costo Atajo Libre", value=10)
     
-    # Costo dinámico
-    costo_real_atajo = c_libre + gamma * max(0, x - capacidad)
-    hubo_sat = 1 if x > capacidad else 0
+    congestion_factor = st.slider("Factor de Congestión", 0.1, 5.0, 1.2)
+
+    shortcut_capacity = st.slider("Capacidad Atajo (K)", 5, total_agents, 25)
+
+    ## Simulation Configuration
+    st.write("")
+
+    number_of_rounds = st.number_input("Cantidad de Rondas", value=100)
+
+    ## Submit Button
+    submitted = st.form_submit_button("Correr Experimento")
+
+if submitted:
+    globals.AGENT_COUNT_MAP[globals.ADVERSE_AGENT_KEY] = n_adverse_agents
+    globals.AGENT_COUNT_MAP[globals.NEUTRAL_AGENT_KEY] = n_neutral_agents
+    globals.SAFE_ROAD_COST = safe_road_costs
+    globals.FREE_SHORTCUT_COST = free_shortcut_cost
+    globals.CONGESTION_FACTOR = congestion_factor
+    globals.SHORTCUT_CAPACITY = shortcut_capacity
+    globals.NUMBER_OF_ROUNDS = number_of_rounds
+
+    results = run_simulation()
+
     
-    # Feedback
-    for a in poblacion:
-        a.actualizar_creencia(hubo_sat)
+    ## Post processing for visualization
+    history = pd.DataFrame(results["history"])
+    agents = results["agents"]
+    
+
+    all_snapshots = []
+    for a in agents:
+        for s in a.snapshots:
+            s['agent_type'] = a.type
+            all_snapshots.append(s)
+    df_snap = pd.DataFrame(all_snapshots)
+
+    round_by_type = df_snap.groupby(['round', 'agent_type'])
+
+    shortcut_counts = round_by_type['decision'].apply(lambda x: (x == globals.SHORTCUT_KEY).sum()).unstack(fill_value=0)
+
+    mean_beliefs = round_by_type['belief'].mean().unstack()
+    mean_expected_cost = round_by_type['expected_cost_shortcut'].mean().unstack()
+
+    ## Visualización
+    st.header("Resultados de la Simulación")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Plot 1: Shortcut Occupation by Agent Type
+        fig1, ax1 = plt.subplots(figsize=(10, 5))
+        shortcut_counts.plot(kind='bar', stacked=True, ax=ax1, alpha=0.8)
+        ax1.axhline(y=shortcut_capacity, color='red', linestyle='--', label=f'Capacidad ({shortcut_capacity})')
+        ax1.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+        plt.xticks(rotation=0)
+        ax1.set_title("Ocupación del Atajo por Tipo de Agente")
+        ax1.set_ylabel("Cantidad de Autos")
+        ax1.set_xlabel("Ronda")
+        st.pyplot(fig1)
+
+        # Plot 2: Expected Costs vs Real Costs
+        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        for col in mean_expected_cost.columns:
+            ax2.plot(mean_expected_cost.index, mean_expected_cost[col], label=f"E[Costo] {col}", linestyle=':')
+        ax2.plot(history['round'], history['real_shortcut_cost'], label="Costo Real Atajo", color='black', linewidth=2)
+        safe_cost = df_snap['expected_cost_safe'].iloc[0] 
+        ax2.axhline(y=safe_cost, color='green', linestyle='-', label="Costo Camino Seguro")
+        ax2.set_title("Variación de Costos (Esperados vs Reales)")
+        ax2.legend()
+        st.pyplot(fig2)
+
+    with col2:
+        ## Plot 3: Mean System Cost
+        fig3, ax3 = plt.subplots(figsize=(10, 5))
+        total_agents = len(agents)
+        history['mean_system_cost'] = (
+            (history['cars_in_shortcut'] * history['real_shortcut_cost']) + 
+            ((total_agents - history['cars_in_shortcut']) * safe_cost)
+        ) / total_agents
         
-    # Guardar métricas
-    costo_total = (x * costo_real_atajo) + ((n_agentes - x) * c_s)
-    historial_flujo.append(x)
-    historial_costo_medio.append(costo_total / n_agentes)
+        ax3.bar(history['round'], history['mean_system_cost'], color='skyblue')
+        ax3.set_title("Costo Medio del Viaje (Sistema Completo)")
+        ax3.set_ylabel("Costo Promedio")
+        st.pyplot(fig3)
 
-# --- VISUALIZACIÓN ---
-col1, col2 = st.columns(2)
+        ## Plot 4: Beliefs Evolution
+        fig4, ax4 = plt.subplots(figsize=(10, 5))
+        for col in mean_beliefs.columns:
+            ax4.plot(mean_beliefs.index, mean_beliefs[col], label=f"Creencia {col}")
 
-with col1:
-    st.subheader("Flujo en el Atajo")
-    fig1, ax1 = plt.subplots()
-    ax1.plot(historial_flujo, color="royalblue")
-    ax1.axhline(capacidad, color="red", linestyle="--", label="Capacidad K")
-    ax1.set_xlabel("Ronda")
-    ax1.set_ylabel("Agentes")
-    ax1.legend()
-    st.pyplot(fig1)
+        for i, row in history.iterrows():
+            if row['shortcut_saturated']:
+                ax4.axvspan(row['round'] - 0.5, row['round'] + 0.5, color='red', alpha=0.2)
 
-with col2:
-    st.subheader("Costo Medio del Viaje")
-    fig2, ax2 = plt.subplots()
-    ax2.plot(historial_costo_medio, color="orange")
-    ax2.axhline(c_s, color="green", linestyle="--", label="Costo sin Atajo")
-    ax2.set_xlabel("Ronda")
-    ax2.set_ylabel("Minutos")
-    ax2.legend()
-    st.pyplot(fig2)
+        ax4.set_title("Evolución de Creencias (Fondo rojo = Saturación)")
+        ax4.set_ylim(0, 1)
+        ax4.legend()
+        st.pyplot(fig4)
+    
+else:
+    st.info("Ajustá los parámetros en el panel izquierdo y hacé clic en 'Correr Experimento' para ver los resultados.")
 
-# Métrica del Costo de la Anarquía (PoA)
-poa_final = historial_costo_medio[-1] / ( (capacidad*c_libre + (n_agentes-capacidad)*c_s) / n_agentes )
-st.metric("Price of Anarchy (PoA)", f"{poa_final:.2f}")
+
