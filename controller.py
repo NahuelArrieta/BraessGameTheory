@@ -16,7 +16,9 @@ def run_simulation():
             agents.append(agent)
 
     ## Calculate expected cost
-    globals.SATURATED_SHORTCUT_COST = globals.FREE_SHORTCUT_COST + globals.CONGESTION_FACTOR * (len(agents) - globals.SHORTCUT_THRESHOLD)
+    globals.SATURATED_SHORTCUT_COST = globals.SAFE_ROAD_COST * 1.05 
+
+    ## Calculate optimal Number of Agents in Shortcut TODO
 
     ## Simulation loop
     shortcut_saturated = 0
@@ -39,6 +41,12 @@ def run_simulation():
             "shortcut_saturated": shortcut_saturated,
             "real_shortcut_cost": real_shortcut_cost
         })
+
+        for a in agents:
+            a.update_belief(shortcut_saturated)
+            if shortcut_saturated:
+                a.update_expected_saturated_shortcut_cost(real_shortcut_cost)
+
 
     ## Return data
     return {
