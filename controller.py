@@ -19,6 +19,15 @@ def run_simulation():
     globals.SATURATED_SHORTCUT_COST = globals.SAFE_ROAD_COST * 1.05 
 
     ## Calculate optimal Number of Agents in Shortcut TODO
+    optimal_n = (globals.SAFE_ROAD_COST + globals.CONGESTION_FACTOR * globals.SHORTCUT_THRESHOLD - globals.FREE_SHORTCUT_COST) / (2 * globals.CONGESTION_FACTOR)
+    optimal_n = max(globals.SHORTCUT_THRESHOLD, min(optimal_n, len(agents)))  # Ensure it's between 0 and total agents
+    globals.OPTIMAL_AGENTS_IN_SHORTCUT = optimal_n
+
+    optimal_shortcut_cost = globals.FREE_SHORTCUT_COST + globals.CONGESTION_FACTOR * max(0, optimal_n - globals.SHORTCUT_THRESHOLD)
+    optimal_cost = (optimal_n * optimal_shortcut_cost + (len(agents) - optimal_n) * globals.SAFE_ROAD_COST) 
+    optimal_average_cost = optimal_cost / len(agents)  
+    globals.OPTIMAL_COST = optimal_average_cost
+
 
     ## Simulation loop
     shortcut_saturated = 0
