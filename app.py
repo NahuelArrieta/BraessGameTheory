@@ -103,8 +103,8 @@ if submitted:
         # Plot 2: Expected Costs vs Real Costs
         fig2, ax2 = plt.subplots(figsize=(10, 5))
         for col in mean_expected_cost.columns:
-            ax2.plot(mean_expected_cost.index, mean_expected_cost[col], label=f"Costo atajo según {col}", linestyle='--')
-        ax2.plot(history['round'], history['real_shortcut_cost'], label="Costo Real Atajo", color='#202020', linewidth=2)
+            ax2.plot(mean_expected_cost.index, mean_expected_cost[col], label=f"Costo atajo según {col}", linestyle='-')
+        ax2.plot(history['round'], history['real_shortcut_cost'], label="Costo Real Atajo", color='#707070', linewidth=2)
         ax2.axhline(y=safe_cost, color='green', linestyle='-', label="Costo Camino Seguro")
         ax2.set_title("Variación de Costos")
         ax2.set_xlabel("Ronda")
