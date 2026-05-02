@@ -1,6 +1,4 @@
 streamlit
 matplotlib
 numpy
-random
 pandas
-math
