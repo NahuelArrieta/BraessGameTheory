@@ -74,10 +74,9 @@ def draw_cars_in_shortcut_per_type_graphic(results):
 
     df_snap['shortcut_choosen'] = (df_snap['decision'] == globals.SHORTCUT_KEY).astype(int)
 
-    conteos_por_partida = df_snap.groupby(['iteration', 'round', 'agent_type'])['shortcut_choosen'].sum().reset_index()
+    count_per_round = df_snap.groupby(['iteration', 'round', 'agent_type'])['shortcut_choosen'].sum().reset_index()
 
-    stats = conteos_por_partida.groupby(['round', 'agent_type'])['shortcut_choosen'].agg(['mean', 'std']).reset_index()
-
+    stats = count_per_round.groupby(['round', 'agent_type'])['shortcut_choosen'].agg(['mean', 'std']).reset_index()
 
     fig, ax = plt.subplots(figsize=(10, 5))
     
@@ -88,7 +87,7 @@ def draw_cars_in_shortcut_per_type_graphic(results):
         df_tipo = stats[stats['agent_type'] == tipo]
         color = colores[idx % len(colores)]
         
-        ax.plot(df_tipo['round'], df_tipo['mean'], label=f'{tipo} (Media)', color=color, linewidth=1.5)
+        ax.plot(df_tipo['round'], df_tipo['mean'], label=f'{tipo}', color=color, linewidth=1.5)
         
         ax.fill_between(df_tipo['round'], 
                         df_tipo['mean'] - df_tipo['std'], 
@@ -109,10 +108,71 @@ def draw_cars_in_shortcut_per_type_graphic(results):
     return fig
 
 
-def draw_graphics(results):
-    st.pyplot(draw_cars_in_shortcut_graph(results))
+def draw_costs_graphic(results):
 
-    st.pyplot(draw_cars_in_shortcut_per_type_graphic(results))
+    
+    # 1. Extraer y agrupar el historial de todas las iteraciones
+    all_histories = []
+    all_snapshots = []
+    for i, run in enumerate(results):
+        # Convertimos a DataFrame por si está en lista de dicts
+        df_temp = pd.DataFrame(run["history"])
+        df_temp['iteration'] = i  # Inyectamos la iteración
+        all_histories.append(df_temp)
+
+        for a in run["agents"]:
+            for s in a.snapshots:
+                s['agent_type'] = a.type
+                s['iteration'] = i
+                all_snapshots.append(s)
+        
+    df_hist = pd.concat(all_histories, ignore_index=True)
+    
+    stats_costo_real = df_hist.groupby('round')['real_shortcut_cost'].agg(['mean', 'std']).reset_index()
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    df_snap = pd.DataFrame(all_snapshots)
+    mean_expected_cost = df_snap.groupby(['round', 'agent_type'])['expected_cost_shortcut'].mean().unstack()
+    std_expected_cost = df_snap.groupby(['round', 'agent_type'])['expected_cost_shortcut'].std().unstack()
+
+    for col in mean_expected_cost.columns:
+        ax.plot(mean_expected_cost.index, mean_expected_cost[col], 
+                 label=f"Costo atajo según {col}", linewidth=1.5)
+        ax.fill_between(
+            mean_expected_cost.index,
+            mean_expected_cost[col] - std_expected_cost[col],
+            mean_expected_cost[col] + std_expected_cost[col],
+            alpha=0.4
+        )
+
+    ax.plot(stats_costo_real['round'], stats_costo_real['mean'], 
+             label="Costo real atajo", color='#707070', linewidth=2)
+             
+    ax.fill_between(stats_costo_real['round'], 
+                     stats_costo_real['mean'] - stats_costo_real['std'], 
+                     stats_costo_real['mean'] + stats_costo_real['std'], 
+                     color='#707070', alpha=0.15) 
+    ax.axhline(y=globals.SAFE_ROAD_COST, color='#2ca02c', linestyle='--', label="Costo Camino Seguro")
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_title("Variación de Costos")
+    ax.set_xlabel("Ronda")
+    ax.set_ylabel("Costo")
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+    ax.legend(loc='upper right')
+
+    return fig
+
+
+
+def draw_graphics(results):
+    #st.pyplot(draw_cars_in_shortcut_graph(results))
+
+    #st.pyplot(draw_cars_in_shortcut_per_type_graphic(results))
+
+    st.pyplot(draw_costs_graphic(results))
 
     return
 
@@ -181,7 +241,7 @@ def draw_graphics(results):
         
 
         # Plot 2: Expected Costs vs Real Costs
-        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        fig, ax2 = plt.subplots(figsize=(10, 5))
         for col in mean_expected_cost.columns:
             ax2.plot(mean_expected_cost.index, mean_expected_cost[col], label=f"Costo atajo según {col}", linestyle='-')
         ax2.plot(history['round'], history['real_shortcut_cost'], label="Costo Real Atajo", color='#707070', linewidth=2)
