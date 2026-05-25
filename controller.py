@@ -1,9 +1,11 @@
 import globals
 from agents import *
+import numpy as np
+
 
 
 def run_simulation():
-    ## Agent creation
+   ## Agent creation
     agents = []
 
     for agent_type in globals.AGENT_COUNT_MAP:
@@ -28,7 +30,19 @@ def run_simulation():
     optimal_average_cost = optimal_cost / len(agents)  
     globals.OPTIMAL_COST = optimal_average_cost
 
+    ## Run iterations
+    iteration_results = []
+    for _ in range(globals.NUMBER_OF_ITERATIONS):
+        iteration_result = run_iteration(agents)
+        iteration_results.append(iteration_result)
+    
+    return {
+        "iteration_results": iteration_results,
+        "agents": agents
+    }
 
+
+def run_iteration(agents):
     ## Simulation loop
     shortcut_saturated = 0
     history = []
@@ -59,6 +73,5 @@ def run_simulation():
 
     ## Return data
     return {
-        "agents": agents,
         "history": history
     }

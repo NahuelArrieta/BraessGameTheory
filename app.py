@@ -40,11 +40,7 @@ with st.sidebar.form("config_simulacion"):
 
     shortcut_capacity = st.slider("Capacidad Atajo (K)", 5, total_agents, 25)
 
-    ## Simulation Configuration
-    st.write("")
-
-    number_of_rounds = st.number_input("Cantidad de Rondas", value=100)
-
+    
     ## Submit Button
     submitted = st.form_submit_button("Correr Experimento")
 
@@ -55,14 +51,30 @@ if submitted:
     globals.FREE_SHORTCUT_COST = free_shortcut_cost
     globals.CONGESTION_FACTOR = congestion_factor
     globals.SHORTCUT_THRESHOLD = shortcut_capacity
-    globals.NUMBER_OF_ROUNDS = number_of_rounds
 
     results = run_simulation()
 
     
     ## Post processing for visualization
-    history = pd.DataFrame(results["history"])
     agents = results["agents"]
+    iteration_results = results["iteration_results"]
+
+    ## Construct an average history across iterations for analysis
+    avg_history = []
+    for round in range(globals.NUMBER_OF_ROUNDS):
+        round_data = [iteration_results[i]["history"][round] for i in range(globals.NUMBER_OF_ITERATIONS)]
+        avg_cars_in_shortcut = np.mean([d["cars_in_shortcut"] for d in round_data])
+        avg_shortcut_saturated = np.mean([d["shortcut_saturated"] for d in round_data])
+        avg_real_shortcut_cost = np.mean([d["real_shortcut_cost"] for d in round_data])
+        
+        avg_history.append({
+            "round": round,
+            "cars_in_shortcut": avg_cars_in_shortcut,
+            "shortcut_saturated": avg_shortcut_saturated,
+            "real_shortcut_cost": avg_real_shortcut_cost
+        })
+
+    history = pd.DataFrame(avg_history)
     
 
     all_snapshots = []
@@ -76,7 +88,7 @@ if submitted:
 
     round_by_type = df_snap.groupby(['round', 'agent_type'])
 
-    shortcut_counts = round_by_type['decision'].apply(lambda x: (x == globals.SHORTCUT_KEY).sum()).unstack(fill_value=0)
+    shortcut_counts = round_by_type['decision'].apply(lambda x: (x == globals.SHORTCUT_KEY).sum()/globals.NUMBER_OF_ITERATIONS).unstack(fill_value=0)
 
     mean_beliefs = round_by_type['belief'].mean().unstack()
     mean_expected_cost = round_by_type['expected_cost_shortcut'].mean().unstack()
