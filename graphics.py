@@ -8,6 +8,9 @@ import globals
 from controller import run_simulation
 
 def draw_graphics(results):
+    agents = results["agents"]
+    iteration_results = results["iteration_results"]
+
     ## Construct an average history across iterations for analysis
     avg_history = []
     for round in range(globals.NUMBER_OF_ROUNDS):
@@ -24,8 +27,6 @@ def draw_graphics(results):
         })
 
     ## Post processing for visualization
-    agents = results["agents"]
-    iteration_results = results["iteration_results"]
     history = pd.DataFrame(avg_history)
     shortcut_capacity = globals.SHORTCUT_THRESHOLD
     optimal_agents = globals.OPTIMAL_AGENTS_IN_SHORTCUT
