@@ -9,12 +9,10 @@ from controller import run_simulation
 
 
 def draw_cars_in_shortcut_graph(results):
-    iteration_results = results["iteration_results"]
-
     ## Calculate average and std deviation of cars in shortcut across iterations for each round
     cars_in_shortcut = []
     for round in range(globals.NUMBER_OF_ROUNDS):
-        round_data = [iteration_results[i]["history"][round] for i in range(globals.NUMBER_OF_ITERATIONS)]
+        round_data = [results[i]["history"][round] for i in range(globals.NUMBER_OF_ITERATIONS)]
         avg_cars_in_shortcut = np.mean([d["cars_in_shortcut"] for d in round_data])
         std_cars_in_shortcut = np.std([d["cars_in_shortcut"] for d in round_data])
         cars_in_shortcut.append({
@@ -29,27 +27,27 @@ def draw_cars_in_shortcut_graph(results):
     ax.plot(
         df_cars_in_shortcut['round'], 
         df_cars_in_shortcut['avg'], 
-        label='Promedio de Autos en Atajo', 
+        label='Autos en Atajo', 
         color='#1f77b4', linewidth=0.8, marker='.', markersize=4
     )
 
-    ax.fill_between(d
-        f_cars_in_shortcut['round'], 
+    ax.fill_between(
+        df_cars_in_shortcut['round'], 
         df_cars_in_shortcut['avg'] - df_cars_in_shortcut['std'], 
         df_cars_in_shortcut['avg'] + df_cars_in_shortcut['std'], 
-        color='#1f77b4', alpha=0.15, label='Desviación Estándar'
+        color='#1f77b4', alpha=0.15
     )
 
-    ax.axhline(
-        y=globals.SHORTCUT_THRESHOLD, color='#d62728', linestyle='--', 
-        linewidth=1.5, label=f'Capacidad Atajo ({globals.SHORTCUT_THRESHOLD})'
-    )
+    shortcut_capacity = globals.SHORTCUT_THRESHOLD
+    optimal_agents = globals.OPTIMAL_AGENTS_IN_SHORTCUT
+    ax.axhline(y=shortcut_capacity, color='#d62728', linestyle='--', label=f'Capacidad ({shortcut_capacity})')
+    ax.axhline(y=optimal_agents, color='#2ca02c', linestyle='--', label=f'Óptimo ({int(optimal_agents)})')
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-    ax.set_title("Promedio de Autos en el Atajo por Ronda", fontsize=14, pad=15)
+    ax.set_title("Autos en el Atajo", fontsize=14, pad=15)
     ax.set_xlabel("Ronda", fontsize=11)
     ax.set_ylabel("Cantidad de Autos", fontsize=11)
 
@@ -57,10 +55,64 @@ def draw_cars_in_shortcut_graph(results):
         
     return fig
 
+def draw_cars_in_shortcut_per_type_graphic(results):
+    all_snapshots = []
+    for i, iteration in enumerate(results):
+        agentes = iteration["agents"] 
+
+        for a in agentes:
+            for s in a.snapshots:
+                s['agent_type'] = a.type
+                s['iteration'] = i
+                all_snapshots.append(s)
+
+            
+    df_snap = pd.DataFrame(all_snapshots)
+
+    print(df_snap)
+
+
+    df_snap['shortcut_choosen'] = (df_snap['decision'] == globals.SHORTCUT_KEY).astype(int)
+
+    conteos_por_partida = df_snap.groupby(['iteration', 'round', 'agent_type'])['shortcut_choosen'].sum().reset_index()
+
+    stats = conteos_por_partida.groupby(['round', 'agent_type'])['shortcut_choosen'].agg(['mean', 'std']).reset_index()
+
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    
+    tipos_agentes = stats['agent_type'].unique()
+    colores = ['#1f77b4', '#ff7f0e']
+
+    for idx, tipo in enumerate(tipos_agentes):
+        df_tipo = stats[stats['agent_type'] == tipo]
+        color = colores[idx % len(colores)]
+        
+        ax.plot(df_tipo['round'], df_tipo['mean'], label=f'{tipo} (Media)', color=color, linewidth=1.5)
+        
+        ax.fill_between(df_tipo['round'], 
+                        df_tipo['mean'] - df_tipo['std'], 
+                        df_tipo['mean'] + df_tipo['std'], 
+                        color=color, alpha=0.15)
+
+   
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+    plt.xticks(rotation=0)
+    
+    ax.set_title("Autos en el Atajo por Tipo de Agente")
+    ax.set_ylabel("Cantidad de Autos")
+    ax.set_xlabel("Ronda")
+    ax.legend(loc='upper right')
+
+    return fig
+
 
 def draw_graphics(results):
-    fig = draw_cars_in_shortcut_graph(results)
-    st.pyplot(fig)
+    st.pyplot(draw_cars_in_shortcut_graph(results))
+
+    st.pyplot(draw_cars_in_shortcut_per_type_graphic(results))
 
     return
 
@@ -126,17 +178,7 @@ def draw_graphics(results):
 
     with col1:
         # Plot 1: Shortcut Occupation by Agent Type
-        fig1, ax1 = plt.subplots(figsize=(10, 5))
-        shortcut_counts_by_type.plot(kind='bar', stacked=True, ax=ax1, alpha=0.8)
-        ax1.axhline(y=shortcut_capacity, color='green', label=f'Capacidad ({shortcut_capacity})')
-        ax1.axhline(y=globals.OPTIMAL_AGENTS_IN_SHORTCUT, color='red', label=f'Óptimo ({int(globals.OPTIMAL_AGENTS_IN_SHORTCUT)})')
-        ax1.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-        plt.xticks(rotation=0)
-        ax1.set_title("Autos en el Atajo por Tipo de Agente")
-        ax1.set_ylabel("Cantidad de Autos")
-        ax1.set_xlabel("Ronda")
-        ax1.legend()
-        st.pyplot(fig1)
+        
 
         # Plot 2: Expected Costs vs Real Costs
         fig2, ax2 = plt.subplots(figsize=(10, 5))
