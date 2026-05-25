@@ -108,16 +108,13 @@ def draw_cars_in_shortcut_per_type_graphic(results):
     return fig
 
 
-def draw_costs_graphic(results):
-
-    
-    # 1. Extraer y agrupar el historial de todas las iteraciones
+def draw_costs_graphic(results):   
     all_histories = []
     all_snapshots = []
+
     for i, run in enumerate(results):
-        # Convertimos a DataFrame por si está en lista de dicts
         df_temp = pd.DataFrame(run["history"])
-        df_temp['iteration'] = i  # Inyectamos la iteración
+        df_temp['iteration'] = i 
         all_histories.append(df_temp)
 
         for a in run["agents"]:
@@ -165,14 +162,68 @@ def draw_costs_graphic(results):
 
     return fig
 
+def draw_mean_system_cost_graphic(results):
+    safe_cost = globals.SAFE_ROAD_COST
+    all_histories = []
 
+    # 1. Extract and calculate the system cost for each iteration
+    for i, run in enumerate(results):
+        df_temp = pd.DataFrame(run["history"])
+        df_temp['iteration'] = i
+        
+        # Obtenemos la cantidad de agentes de esta corrida para la fórmula
+        # Usamos .get() con ambos nombres posibles por si usaste 'agent' o 'agents'
+        total_agents = len(run.get("agents", run.get("agent", [])))
+        
+        # Calculamos el costo del sistema para esta iteración específica
+        df_temp['system_cost'] = (
+            (df_temp['cars_in_shortcut'] * df_temp['real_shortcut_cost']) + 
+            ((total_agents - df_temp['cars_in_shortcut']) * safe_cost)
+        ) / total_agents
+        
+        all_histories.append(df_temp)
+        
+    df_hist = pd.concat(all_histories, ignore_index=True)
+
+    # 2. Group by round and calculate mean and std
+    stats_system_cost = df_hist.groupby('round')['system_cost'].agg(['mean', 'std']).reset_index()
+
+    # 3. Create the plot
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # Plot the mean line
+    ax.plot(stats_system_cost['round'], stats_system_cost['mean'], 
+            label='Mean System Cost', color='#1f77b4', linewidth=2)
+
+    # Add the shaded area for variance
+    ax.fill_between(stats_system_cost['round'], 
+                    stats_system_cost['mean'] - stats_system_cost['std'], 
+                    stats_system_cost['mean'] + stats_system_cost['std'], 
+                    color='#1f77b4', alpha=0.15)
+
+    # Add reference lines
+    ax.axhline(y=safe_cost, color='#2ca02c', linestyle='--', label=f'Safe Path Cost ({safe_cost})')
+    ax.axhline(y=globals.OPTIMAL_COST, color='#d62728', linestyle='--', label=f'Optimal Cost ({globals.OPTIMAL_COST:.2f})')
+
+    # Visual cleanup & formatting in English
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_title("Average Travel Cost", fontsize=14, pad=15)
+    ax.set_ylabel("Minutes", fontsize=11)
+    ax.set_xlabel("Round", fontsize=11)
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+    ax.legend(loc='upper right')
+
+    return fig
 
 def draw_graphics(results):
     #st.pyplot(draw_cars_in_shortcut_graph(results))
 
     #st.pyplot(draw_cars_in_shortcut_per_type_graphic(results))
 
-    st.pyplot(draw_costs_graphic(results))
+    # st.pyplot(draw_costs_graphic(results))
+
+    st.pyplot(draw_mean_system_cost_graphic(results))
 
     return
 
