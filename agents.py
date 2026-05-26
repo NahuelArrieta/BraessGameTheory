@@ -27,21 +27,13 @@ class Agente:
         return globals.SAFE_ROAD_COST
 
     def decide(self, expected_cost_shortcut, expected_cost_safe):
-        # 1. Calculamos la diferencia de costos
-        # Si el atajo es más barato, la diferencia es negativa
         diff = expected_cost_shortcut - expected_cost_safe
         
-        # 2. Aplicamos la función logística para obtener la probabilidad de elegir el atajo
-        # beta controla qué tan "racionales" son: 
-        # beta alto -> eligen siempre el más barato (vuelve el serrucho)
-        # beta bajo -> son más aleatorios
         try:
             prob_shortcut = 1 / (1 + math.exp(globals.BETA * diff))
         except OverflowError:
-            # Manejo de extremos para evitar errores matemáticos
             prob_shortcut = 1.0 if diff < 0 else 0.0
 
-        # 3. Decisión estocástica
         if random.random() < prob_shortcut:
             return globals.SHORTCUT_KEY
         else:
