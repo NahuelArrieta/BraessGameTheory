@@ -263,31 +263,5 @@ def draw_beliefs_evolution_graphic(results):
     fig.tight_layout()
     return fig
 
-def draw_graphics(results):
-    col1, col2, col3 = st.columns(3, gap="medium")
-
-    with col1:
-        st.pyplot(draw_cars_in_shortcut_graph(results), use_container_width=True)
-        st.pyplot(draw_mean_system_cost_graphic(results), use_container_width=True)
-
-    with col2:
-        st.pyplot(draw_cars_in_shortcut_per_type_graphic(results), use_container_width=True)
-        st.pyplot(draw_beliefs_evolution_graphic(results), use_container_width=True)
-
-    with col3:
-        st.pyplot(draw_costs_graphic(results), use_container_width=True)
-        with st.container(border=True):
-            ## Write parameters
-            st.header("  Parametros")
-            st.markdown(f"""
-        * **N° agentes adversos:** `{globals.AGENT_COUNT_MAP[globals.ADVERSE_AGENT_KEY]}`
-        * **N° agentes neutrales:** `{globals.AGENT_COUNT_MAP[globals.NEUTRAL_AGENT_KEY]}`
-        * **Costo ruta segura:** `{globals.SAFE_ROAD_COST}`
-        * **Costo atajo libre:** `{globals.FREE_SHORTCUT_COST}`
-        * **Factor de congestión:** `{globals.CONGESTION_FACTOR}`
-        * **Capacidad atajo (K):** `{globals.SHORTCUT_THRESHOLD}`
-        """)
-
-
 
     

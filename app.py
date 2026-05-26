@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import globals
 from controller import run_simulation
-import graphics
+from graphics import *
 
 
 st.set_page_config(page_title="Paradoja de Braess", layout="wide")
@@ -53,9 +53,40 @@ if submitted:
     globals.CONGESTION_FACTOR = congestion_factor
     globals.SHORTCUT_THRESHOLD = shortcut_capacity
 
-    results = run_simulation()
 
-    graphics.draw_graphics(results)
+   
+    with st.spinner("Simulación en progreso..."):
+        results = run_simulation()
+        graphics = [
+            draw_cars_in_shortcut_graph(results),
+            draw_cars_in_shortcut_per_type_graphic(results),
+            draw_costs_graphic(results),
+            draw_mean_system_cost_graphic(results),
+            draw_beliefs_evolution_graphic(results)
+        ]
+    
+
+    col1, col2 = st.columns(2, gap="medium")
+
+    with col1:
+        st.pyplot(graphics[0], use_container_width=True)
+        st.pyplot(graphics[2], use_container_width=True)
+        st.pyplot(graphics[4], use_container_width=True)
+        
+    with col2:
+        st.pyplot(graphics[1], use_container_width=True)
+        st.pyplot(graphics[3], use_container_width=True)
+        with st.container(border=True):
+            st.header("  Parametros")
+            st.markdown(f"""
+            * **N° agentes adversos:** `{globals.AGENT_COUNT_MAP[globals.ADVERSE_AGENT_KEY]}`
+            * **N° agentes neutrales:** `{globals.AGENT_COUNT_MAP[globals.NEUTRAL_AGENT_KEY]}`
+            * **Costo ruta segura:** `{globals.SAFE_ROAD_COST}`
+            * **Costo atajo libre:** `{globals.FREE_SHORTCUT_COST}`
+            * **Factor de congestión:** `{globals.CONGESTION_FACTOR}`
+            * **Capacidad atajo (K):** `{globals.SHORTCUT_THRESHOLD}`
+            """)
+
 else:
     st.info("Ajustá los parámetros en el panel izquierdo y hacé clic en 'Correr Experimento' para ver los resultados.")
 
