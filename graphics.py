@@ -40,8 +40,8 @@ def draw_cars_in_shortcut_graph(results):
 
     shortcut_capacity = globals.SHORTCUT_THRESHOLD
     optimal_agents = globals.OPTIMAL_AGENTS_IN_SHORTCUT
-    ax.axhline(y=shortcut_capacity, color='#d62728', linestyle='--', label=f'Capacidad ({shortcut_capacity})')
-    ax.axhline(y=optimal_agents, color='#2ca02c', linestyle='--', label=f'Óptimo ({int(optimal_agents)})')
+    ax.axhline(y=optimal_agents, color='#2ca02c', label=f'Óptimo ({int(optimal_agents)})')
+    ax.axhline(y=shortcut_capacity, color='#202020', linestyle='--', label=f'Capacidad ({shortcut_capacity})')
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -53,6 +53,7 @@ def draw_cars_in_shortcut_graph(results):
 
     ax.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.9)
         
+    fig.tight_layout()
     return fig
 
 def draw_cars_in_shortcut_per_type_graphic(results):
@@ -102,6 +103,7 @@ def draw_cars_in_shortcut_per_type_graphic(results):
     ax.set_xlabel("Ronda")
     ax.legend(loc='upper right')
 
+    fig.tight_layout()
     return fig
 
 
@@ -147,7 +149,7 @@ def draw_costs_graphic(results):
                      stats_costo_real['mean'] - stats_costo_real['std'], 
                      stats_costo_real['mean'] + stats_costo_real['std'], 
                      color='#707070', alpha=0.15) 
-    ax.axhline(y=globals.SAFE_ROAD_COST, color='#2ca02c', linestyle='--', label="Costo Camino Seguro")
+    ax.axhline(y=globals.SAFE_ROAD_COST, color='#d62728', label="Costo ruta segura")
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -157,22 +159,19 @@ def draw_costs_graphic(results):
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
     ax.legend(loc='upper right')
 
+    fig.tight_layout()
     return fig
 
 def draw_mean_system_cost_graphic(results):
     safe_cost = globals.SAFE_ROAD_COST
     all_histories = []
 
-    # 1. Extract and calculate the system cost for each iteration
     for i, run in enumerate(results):
         df_temp = pd.DataFrame(run["history"])
         df_temp['iteration'] = i
         
-        # Obtenemos la cantidad de agentes de esta corrida para la fórmula
-        # Usamos .get() con ambos nombres posibles por si usaste 'agent' o 'agents'
         total_agents = len(run.get("agents", run.get("agent", [])))
         
-        # Calculamos el costo del sistema para esta iteración específica
         df_temp['system_cost'] = (
             (df_temp['cars_in_shortcut'] * df_temp['real_shortcut_cost']) + 
             ((total_agents - df_temp['cars_in_shortcut']) * safe_cost)
@@ -182,236 +181,113 @@ def draw_mean_system_cost_graphic(results):
         
     df_hist = pd.concat(all_histories, ignore_index=True)
 
-    # 2. Group by round and calculate mean and std
     stats_system_cost = df_hist.groupby('round')['system_cost'].agg(['mean', 'std']).reset_index()
 
-    # 3. Create the plot
     fig, ax = plt.subplots(figsize=(10, 5))
 
-    # Plot the mean line
     ax.plot(stats_system_cost['round'], stats_system_cost['mean'], 
-            label='Mean System Cost', color='#1f77b4', linewidth=2)
+            label='Costo promedio', color='#1f77b4', linewidth=2)
 
-    # Add the shaded area for variance
     ax.fill_between(stats_system_cost['round'], 
                     stats_system_cost['mean'] - stats_system_cost['std'], 
                     stats_system_cost['mean'] + stats_system_cost['std'], 
                     color='#1f77b4', alpha=0.15)
 
-    # Add reference lines
-    ax.axhline(y=safe_cost, color='#2ca02c', linestyle='--', label=f'Safe Path Cost ({safe_cost})')
-    ax.axhline(y=globals.OPTIMAL_COST, color='#d62728', linestyle='--', label=f'Optimal Cost ({globals.OPTIMAL_COST:.2f})')
+    ax.axhline(y=safe_cost, color='#d62728', label=f'Costo ruta segura ({safe_cost})') 
+    ax.axhline(y=globals.OPTIMAL_COST, color='#2ca02c', label=f'Costo óptimo ({globals.OPTIMAL_COST:.2f})')
 
-    # Visual cleanup & formatting in English
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.set_title("Average Travel Cost", fontsize=14, pad=15)
-    ax.set_ylabel("Minutes", fontsize=11)
-    ax.set_xlabel("Round", fontsize=11)
+    ax.set_title("Costo Promedio de Viaje", fontsize=14, pad=15)
+    ax.set_ylabel("Minutos", fontsize=11)
+    ax.set_xlabel("Ronda", fontsize=11)
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
     ax.legend(loc='upper right')
 
+    fig.tight_layout()
     return fig
 
 def draw_beliefs_evolution_graphic(results):
     all_histories = []
     all_snapshots = []
 
-    # 1. Extract data from all iterations
     for i, run in enumerate(results):
         df_temp = pd.DataFrame(run["history"])
         df_temp['iteration'] = i
         all_histories.append(df_temp)
 
-        # Manejamos "agent" o "agents" según cómo esté en tu dict
         for a in run.get("agents", run.get("agent", [])):
             for s in a.snapshots:
                 s['agent_type'] = a.type
                 s['iteration'] = i
                 all_snapshots.append(s)
 
-    # 2. Process beliefs (Mean & Std)
     df_snap = pd.DataFrame(all_snapshots)
-    print("sadsa", df_snap.columns)
-    # IMPORTANTE: Cambiá 'p' por el nombre real de tu variable (ej. 'creencia_saturacion')
     stats_beliefs = df_snap.groupby(['round', 'agent_type'])['belief'].agg(['mean', 'std']).reset_index()
 
-    # 3. Process saturation probability
     df_hist = pd.concat(all_histories, ignore_index=True)
-    # El promedio de un booleano (True/False) nos da la probabilidad (0.0 a 1.0)
     saturation_prob = df_hist.groupby('round')['shortcut_saturated'].mean()
 
-    # 4. Create the plot
     fig, ax = plt.subplots(figsize=(10, 5))
 
     agent_types = stats_beliefs['agent_type'].unique()
     colors = ['#1f77b4', '#ff7f0e']
 
-    # Plot lines and shaded areas for each agent type
     for idx, agent_type in enumerate(agent_types):
         color = colors[idx % len(colors)]
         df_type = stats_beliefs[stats_beliefs['agent_type'] == agent_type]
 
-        # Mean line
-        ax.plot(df_type['round'], df_type['mean'], label=f'{agent_type} Belief', color=color, linewidth=1.5)
+        ax.plot(df_type['round'], df_type['mean'], label=f'Creencia {agent_type}', color=color, linewidth=1.5)
 
-        # Std deviation shading
         ax.fill_between(df_type['round'],
                         df_type['mean'] - df_type['std'],
                         df_type['mean'] + df_type['std'],
                         color=color, alpha=0.30)
 
-    # 5. Background shading for saturation probability
     labeled_saturation = False
     for round_num, prob in saturation_prob.items():
-        if prob > 0: # Solo pintamos si hubo al menos 1 iteración saturada
-            label_text = "Saturated Shortcut" if not labeled_saturation else ""
-            # Multiplicamos prob * 0.3 para que el rojo máximo no tape las líneas
-            ax.axvspan(round_num - 0.5, round_num + 0.5, color='#000000', alpha=prob * 0.5, lw=0, label=label_text)
+        if prob > 0: 
+            label_text = "Atajo Saturado" if not labeled_saturation else ""
+            ax.axvspan(round_num - 0.5, round_num + 0.5, color='#000000', alpha=prob * 0.3, lw=0, label=label_text)
             labeled_saturation = True
 
-    # Visual cleanup & formatting in English
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.set_title("Beliefs Evolution", fontsize=14, pad=15)
+    ax.set_title("Evolución de Creencias", fontsize=14, pad=15)
     ax.set_ylim(0, 1)
-    ax.set_xlabel("Round", fontsize=11)
-    ax.set_ylabel("Saturation Belief", fontsize=11)
+    ax.set_xlabel("Ronda", fontsize=11)
+    ax.set_ylabel("Creencia de Saturación", fontsize=11)
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
     ax.legend(loc='upper right')
 
+    fig.tight_layout()
     return fig
 
 def draw_graphics(results):
-    #st.pyplot(draw_cars_in_shortcut_graph(results))
-
-    #st.pyplot(draw_cars_in_shortcut_per_type_graphic(results))
-
-    # st.pyplot(draw_costs_graphic(results))
-
-    # st.pyplot(draw_mean_system_cost_graphic(results))
-
-    st.pyplot(draw_beliefs_evolution_graphic(results))
-
-    return
-
-    agents = results["agents"]
-    iteration_results = results["iteration_results"]
-
-    ## Construct an average history across iterations for analysis
-    cars_in_shortcut = {
-        "avg": np.mean([iteration_results[i]["history"][round]["cars_in_shortcut"] for i in range(globals.NUMBER_OF_ITERATIONS) for round in range(globals.NUMBER_OF_ROUNDS)]),
-        "std": np.std([iteration_results[i]["history"][round]["cars_in_shortcut"] for i in range(globals.NUMBER_OF_ITERATIONS) for round in range(globals.NUMBER_OF_ROUNDS)])
-    }
-
-    df_cars_in_shortcut = pd.DataFrame(cars_in_shortcut)
-    st.line_chart(df_cars_in_shortcut)
-
-    # avg_history = []
-    # for round in range(globals.NUMBER_OF_ROUNDS):
-    #     round_data = [iteration_results[i]["history"][round] for i in range(globals.NUMBER_OF_ITERATIONS)]
-    #     avg_cars_in_shortcut = np.mean([d["cars_in_shortcut"] for d in round_data])
-    #     avg_shortcut_saturated = np.mean([d["shortcut_saturated"] for d in round_data])
-    #     avg_real_shortcut_cost = np.mean([d["real_shortcut_cost"] for d in round_data])
-
-    #     avg_history.append({
-    #         "round": round,
-    #         "cars_in_shortcut": avg_cars_in_shortcut,
-    #         "shortcut_saturated": avg_shortcut_saturated,
-    #         "real_shortcut_cost": avg_real_shortcut_cost
-    #     })
-
-    ## Post processing for visualization
-    ## history = pd.DataFrame(avg_history)
-    shortcut_capacity = globals.SHORTCUT_THRESHOLD
-    optimal_agents = globals.OPTIMAL_AGENTS_IN_SHORTCUT
-
-    ## Calculate shortcut occupation by agent type
-    all_snapshots = []
-    for a in agents:
-        for s in a.snapshots:
-            s['agent_type'] = a.type
-            all_snapshots.append(s)
-    df_snap = pd.DataFrame(all_snapshots)
-
-    safe_cost = globals.SAFE_ROAD_COST
-
-    round_by_type = df_snap.groupby(['round', 'agent_type'])
-
-    shortcut_counts_by_type = round_by_type['decision'].apply(
-        lambda x: (x == globals.SHORTCUT_KEY).sum()/globals.NUMBER_OF_ITERATIONS
-    ).unstack(fill_value=0)
-
-    shortcut_counts_total = df_snap.groupby('round')['decision'].apply(
-        lambda x: (x == globals.SHORTCUT_KEY).sum()/globals.NUMBER_OF_ITERATIONS
-    )
-
-    ## Calculate mean beliefs and expected costs
-    mean_beliefs = round_by_type['belief'].mean().unstack()
-    mean_expected_cost = round_by_type['expected_cost_shortcut'].mean().unstack()
-
-    ## Visualización
-    st.header("Resultados de la Simulación")
-
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3, gap="medium")
 
     with col1:
-        # Plot 1: Shortcut Occupation by Agent Type
-        
-
-        # Plot 2: Expected Costs vs Real Costs
-        fig, ax2 = plt.subplots(figsize=(10, 5))
-        for col in mean_expected_cost.columns:
-            ax2.plot(mean_expected_cost.index, mean_expected_cost[col], label=f"Costo atajo según {col}", linestyle='-')
-        ax2.plot(history['round'], history['real_shortcut_cost'], label="Costo Real Atajo", color='#707070', linewidth=2)
-        ax2.axhline(y=safe_cost, color='green', linestyle='-', label="Costo Camino Seguro")
-        ax2.set_title("Variación de Costos")
-        ax2.set_xlabel("Ronda")
-        ax2.set_ylabel("Costo")
-        ax2.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-        ax2.legend()
-        st.pyplot(fig2)
+        st.pyplot(draw_cars_in_shortcut_graph(results), use_container_width=True)
+        st.pyplot(draw_mean_system_cost_graphic(results), use_container_width=True)
 
     with col2:
-        ## Plot 3: Mean System Cost
-        fig3, ax3 = plt.subplots(figsize=(10, 5))
-        total_agents = len(agents)
-        history['mean_system_cost'] = (
-            (history['cars_in_shortcut'] * history['real_shortcut_cost']) + 
-            ((total_agents - history['cars_in_shortcut']) * safe_cost)
-        ) / total_agents
-        
-        ax3.bar(history['round'], history['mean_system_cost'], color='skyblue')
-        ax3.set_title("Costo Medio del Viaje")
-        ax3.axhline(y=safe_cost, color='green', label=f'Costo Camino Seguro ({safe_cost})')
-        ax3.axhline(y=globals.OPTIMAL_COST, color='red', label=f'Costo Óptimo ({globals.OPTIMAL_COST:.2f})')
-        ax3.set_ylabel("Minutos")
-        ax3.set_xlabel("Ronda")
-        ax3.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-        ax3.legend()
-        st.pyplot(fig3)
+        st.pyplot(draw_cars_in_shortcut_per_type_graphic(results), use_container_width=True)
+        st.pyplot(draw_beliefs_evolution_graphic(results), use_container_width=True)
 
-        ## Plot 4: Beliefs Evolution
-        fig4, ax4 = plt.subplots(figsize=(10, 5))
-        for col in mean_beliefs.columns:
-            ax4.plot(mean_beliefs.index, mean_beliefs[col], label=f"Creencia {col}")
+    with col3:
+        st.pyplot(draw_costs_graphic(results), use_container_width=True)
+        with st.container(border=True):
+            ## Write parameters
+            st.header("  Parametros")
+            st.markdown(f"""
+        * **N° agentes adversos:** `{globals.AGENT_COUNT_MAP[globals.ADVERSE_AGENT_KEY]}`
+        * **N° agentes neutrales:** `{globals.AGENT_COUNT_MAP[globals.NEUTRAL_AGENT_KEY]}`
+        * **Costo ruta segura:** `{globals.SAFE_ROAD_COST}`
+        * **Costo atajo libre:** `{globals.FREE_SHORTCUT_COST}`
+        * **Factor de congestión:** `{globals.CONGESTION_FACTOR}`
+        * **Capacidad atajo (K):** `{globals.SHORTCUT_THRESHOLD}`
+        """)
 
-        saturacion_etiquetada = False
-        for i, row in history.iterrows():
-            if row['shortcut_saturated']:
-                label_text = "Atajo saturado" if not saturacion_etiquetada else ""
-                ax4.axvspan(row['round'] - 0.5, row['round'] + 0.5, color='red', alpha=0.2, label=label_text)
-                saturacion_etiquetada = True
 
-        ax4.set_title("Evolución de Creencias")
-        ax4.set_ylim(0, 1)
-        ax4.set_xlabel("Ronda")
-        ax4.set_ylabel("Creencia de Saturación")
-        ax4.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
-        ax4.legend()
-        st.pyplot(fig4)
 
     
-    
-
-
