@@ -69,9 +69,6 @@ def draw_cars_in_shortcut_per_type_graphic(results):
             
     df_snap = pd.DataFrame(all_snapshots)
 
-    print(df_snap)
-
-
     df_snap['shortcut_choosen'] = (df_snap['decision'] == globals.SHORTCUT_KEY).astype(int)
 
     count_per_round = df_snap.groupby(['iteration', 'round', 'agent_type'])['shortcut_choosen'].sum().reset_index()
@@ -216,6 +213,75 @@ def draw_mean_system_cost_graphic(results):
 
     return fig
 
+def draw_beliefs_evolution_graphic(results):
+    all_histories = []
+    all_snapshots = []
+
+    # 1. Extract data from all iterations
+    for i, run in enumerate(results):
+        df_temp = pd.DataFrame(run["history"])
+        df_temp['iteration'] = i
+        all_histories.append(df_temp)
+
+        # Manejamos "agent" o "agents" según cómo esté en tu dict
+        for a in run.get("agents", run.get("agent", [])):
+            for s in a.snapshots:
+                s['agent_type'] = a.type
+                s['iteration'] = i
+                all_snapshots.append(s)
+
+    # 2. Process beliefs (Mean & Std)
+    df_snap = pd.DataFrame(all_snapshots)
+    print("sadsa", df_snap.columns)
+    # IMPORTANTE: Cambiá 'p' por el nombre real de tu variable (ej. 'creencia_saturacion')
+    stats_beliefs = df_snap.groupby(['round', 'agent_type'])['belief'].agg(['mean', 'std']).reset_index()
+
+    # 3. Process saturation probability
+    df_hist = pd.concat(all_histories, ignore_index=True)
+    # El promedio de un booleano (True/False) nos da la probabilidad (0.0 a 1.0)
+    saturation_prob = df_hist.groupby('round')['shortcut_saturated'].mean()
+
+    # 4. Create the plot
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    agent_types = stats_beliefs['agent_type'].unique()
+    colors = ['#1f77b4', '#ff7f0e']
+
+    # Plot lines and shaded areas for each agent type
+    for idx, agent_type in enumerate(agent_types):
+        color = colors[idx % len(colors)]
+        df_type = stats_beliefs[stats_beliefs['agent_type'] == agent_type]
+
+        # Mean line
+        ax.plot(df_type['round'], df_type['mean'], label=f'{agent_type} Belief', color=color, linewidth=1.5)
+
+        # Std deviation shading
+        ax.fill_between(df_type['round'],
+                        df_type['mean'] - df_type['std'],
+                        df_type['mean'] + df_type['std'],
+                        color=color, alpha=0.30)
+
+    # 5. Background shading for saturation probability
+    labeled_saturation = False
+    for round_num, prob in saturation_prob.items():
+        if prob > 0: # Solo pintamos si hubo al menos 1 iteración saturada
+            label_text = "Saturated Shortcut" if not labeled_saturation else ""
+            # Multiplicamos prob * 0.3 para que el rojo máximo no tape las líneas
+            ax.axvspan(round_num - 0.5, round_num + 0.5, color='#000000', alpha=prob * 0.5, lw=0, label=label_text)
+            labeled_saturation = True
+
+    # Visual cleanup & formatting in English
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_title("Beliefs Evolution", fontsize=14, pad=15)
+    ax.set_ylim(0, 1)
+    ax.set_xlabel("Round", fontsize=11)
+    ax.set_ylabel("Saturation Belief", fontsize=11)
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
+    ax.legend(loc='upper right')
+
+    return fig
+
 def draw_graphics(results):
     #st.pyplot(draw_cars_in_shortcut_graph(results))
 
@@ -223,7 +289,9 @@ def draw_graphics(results):
 
     # st.pyplot(draw_costs_graphic(results))
 
-    st.pyplot(draw_mean_system_cost_graphic(results))
+    # st.pyplot(draw_mean_system_cost_graphic(results))
+
+    st.pyplot(draw_beliefs_evolution_graphic(results))
 
     return
 
