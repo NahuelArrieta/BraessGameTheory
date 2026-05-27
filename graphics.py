@@ -52,6 +52,8 @@ def draw_cars_in_shortcut_graph(results):
     ax.set_ylabel("Cantidad de Autos", fontsize=11)
 
     ax.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.9)
+
+    ax.set_ylim(bottom=0)
         
     fig.tight_layout()
     return fig
@@ -92,6 +94,7 @@ def draw_cars_in_shortcut_per_type_graphic(results):
                         df_tipo['mean'] + df_tipo['std'], 
                         color=color, alpha=0.15)
 
+    ax.set_ylim(bottom=0)
    
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -159,6 +162,8 @@ def draw_costs_graphic(results):
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
     ax.legend(loc='upper right')
 
+    ax.set_ylim(bottom=0)
+
     fig.tight_layout()
     return fig
 
@@ -203,6 +208,8 @@ def draw_mean_system_cost_graphic(results):
     ax.set_xlabel("Ronda", fontsize=11)
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
     ax.legend(loc='upper right')
+
+    ax.set_ylim(bottom=0)
 
     fig.tight_layout()
     return fig
@@ -259,6 +266,8 @@ def draw_beliefs_evolution_graphic(results):
     ax.set_ylabel("Creencia de Saturación", fontsize=11)
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
     ax.legend(loc='upper right')
+
+    ax.set_ylim(bottom=0)
 
     fig.tight_layout()
     return fig
